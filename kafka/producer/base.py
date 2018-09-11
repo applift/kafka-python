@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import atexit
 import logging
 import time
+import random
 
 try:
     from queue import Empty, Full, Queue  # pylint: disable=import-error
@@ -125,9 +126,17 @@ def _send_upstream(queue, client, codec, batch_time, batch_size,
                 stop_event.set()
                 break
 
+            topic_partitions = client.topic_partitions
+
             # Adjust the timeout to match the remaining period
             count -= 1
             timeout = send_at - time.time()
+            partitions_for_topic = len(topic_partitions[topic_partition.topic])
+            partition = topic_partition.partition
+            while topic_partitions[topic_partition.topic][topic_partition.partition] != -1:
+                log.warn('APPLIFT : Leader not found for %s:%d, reassigning data to other', topic_partition.topic, partition)
+                partition = random.randint(0, partitions_for_topic)
+            topic_partition = TopicPartition(topic_partition.topic, partition)
             msgset[topic_partition].append((msg, key))
 
         # Send collected requests upstream
